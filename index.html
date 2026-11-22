@@ -119,8 +119,12 @@ details summary{cursor:pointer;font-weight:800;min-height:44px;display:flex;alig
 .dice b{font-size:18px;overflow-wrap:anywhere}
 @media(max-width:700px){.wheelbox{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){#wg{transition:none!important}}
+.padwrap{position:relative;margin:8px 0}
+canvas.pad{display:block;width:100%;height:150px;border:2px solid var(--line);border-radius:10px;touch-action:none;color:var(--ink);background:var(--bg);background-image:linear-gradient(to bottom,transparent 72%,var(--soft) 72%,var(--soft) calc(72% + 2px),transparent calc(72% + 2px));cursor:crosshair}
+.padn{position:absolute;left:8px;top:4px;font-weight:800;color:var(--mut)}
+.gap{font-weight:800;letter-spacing:.05em}
 .key{font-size:.8em;color:var(--mut);font-weight:400}
-.opt.sel .key{color:inherit}
+.opt.sel .key,.btn.pri .key{color:inherit}
 @media(max-width:600px){body{font-size:17px}nav a{padding:8px 9px;font-size:16px}.brand{font-size:25px}table{font-size:14px}}
 @media(max-width:480px){.hrow{padding-top:8px}.brand{font-size:22px}.status{font-size:12px}nav{flex-wrap:nowrap;overflow-x:auto;margin-top:4px}nav a{flex:none;min-height:44px;padding:6px 9px;font-size:15px}main{padding:12px 0 40px}h1{font-size:28px}h2{font-size:22px;margin-top:22px}.card{padding:14px;border-width:2px}.q{font-size:20px;margin-bottom:12px}.opt{font-size:17px;min-height:48px;padding:8px 12px}.btn{min-height:46px;padding:8px 14px;font-size:16px}input.ans{font-size:20px;min-height:50px}.tile{min-height:0;padding:12px}.tile .big{font-size:32px}.tile b{font-size:18px}.flash .w{font-size:34px}.meta{margin-bottom:6px}.prog{margin-bottom:10px}}
 </style>
@@ -139,6 +143,7 @@ details summary{cursor:pointer;font-weight:800;min-height:44px;display:flex;alig
  </nav>
 </div></header>
 <main class="wrap" id="view"></main>
+<script>window.PDFJS_BASE = "./lib/";</script>
 <script>/* verbs.js */
 /* Silnik odmiany czasowników włoskich: wszystkie czasy i tryby B1–B2. */
 window.VERBS = (function () {
@@ -1635,12 +1640,16 @@ const firstAlt = a => (Array.isArray(a) ? a[0] : String(a)).split("|")[0];
 /* ====== stan i zapis ====== */
 const LS = "wl-app-v1";
 const OFFLINE = !(window.claude && window.claude.use);
-let S = { words: {}, srs: {}, res: {}, resT: {}, gen: {}, del: {}, stat: {}, misc: {} };
+let S = { words: {}, srs: {}, res: {}, resT: {}, gen: {}, del: {}, stat: {}, misc: {}, texts: {} };
 try { const x = JSON.parse(localStorage.getItem(LS) || "null"); if (x) for (const k in S) if (x[k]) S[k] = x[k]; } catch (e) {}
 const MISC0 = { steps: {}, tenses: ["pres", "pp", "impf", "fut", "cond", "cpres", "cimp"], newPerDay: 15, intro: {}, day: {}, best: {}, goal: 100, eink: false, autoSay: false, u: 0 };
 const fixMisc = () => { S.misc = Object.assign({}, MISC0, S.misc || {}); ["steps", "intro", "day", "best"].forEach(k => { if (!S.misc[k] || typeof S.misc[k] !== "object") S.misc[k] = {}; }); if (!Array.isArray(S.misc.tenses)) S.misc.tenses = MISC0.tenses.slice(); };
 fixMisc();
-const STATE_KEYS = ["srs", "res", "resT", "gen", "misc", "del", "stat"];
+const STATE_KEYS = ["srs", "res", "resT", "gen", "misc", "del", "stat", "texts"];
+/* ustawienia tego urządzenia (nie synchronizują się): klawiatura czy rysik */
+let DEV = {}; try { DEV = JSON.parse(localStorage.getItem("wl-dev") || "{}") || {}; } catch (e) {}
+const saveDev = () => { try { localStorage.setItem("wl-dev", JSON.stringify(DEV)); } catch (e) {} };
+const PEN = () => DEV.input === "pen";
 let lsT;
 const saveLocal = () => { clearTimeout(lsT); lsT = setTimeout(() => { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} }, 250); };
 let DB = null, SAMPLE = null, TTS = null, DL = null, dbMode = "local", canImg = false;
@@ -1668,6 +1677,8 @@ function mergeInto(x, push) {
   for (const k in (x.srs || {})) if (!S.srs[k] || (x.srs[k].t || 0) > (S.srs[k].t || 0)) S.srs[k] = x.srs[k];
   for (const k in (x.res || {})) { const rt = (x.resT || {})[k] || 0; if (S.res[k] == null || rt > (S.resT[k] || 0)) { if (S.res[k] !== x.res[k]) nr++; S.res[k] = x.res[k]; S.resT[k] = rt; } }
   for (const t in (x.gen || {})) { const ids = new Set((S.gen[t] || []).map(i => i.id)); S.gen[t] = (S.gen[t] || []).concat((x.gen[t] || []).filter(i => i && !ids.has(i.id))); }
+  for (const id in (x.texts || {})) { const r = x.texts[id]; if (!r || !r.body) continue; if (S.del[id] && S.del[id] >= wT(r)) continue; const l = S.texts[id]; if (!l || wT(r) > wT(l)) S.texts[id] = r; }
+  for (const id in S.texts) if (S.del[id] && S.del[id] >= wT(S.texts[id])) delete S.texts[id];
   for (const c in (x.stat || {})) { const a = x.stat[c], b = S.stat[c]; if (!b || (a && a[1] > b[1])) S.stat[c] = a; }
   const m = x.misc || {};
   ["day", "intro", "best"].forEach(k => { for (const d in (m[k] || {})) S.misc[k][d] = Math.max(S.misc[k][d] || 0, m[k][d] || 0); });
@@ -1677,7 +1688,7 @@ function mergeInto(x, push) {
   if (push) STATE_KEYS.forEach(k => saveState(k));
   return { nw, nr, nd };
 }
-const exportJSON = () => JSON.stringify({ app: "wloski", v: 2, at: now(), words: S.words, del: S.del, srs: S.srs, res: S.res, resT: S.resT, gen: S.gen, misc: S.misc, stat: S.stat });
+const exportJSON = () => JSON.stringify({ app: "wloski", v: 2, at: now(), words: S.words, del: S.del, srs: S.srs, res: S.res, resT: S.resT, gen: S.gen, misc: S.misc, stat: S.stat, texts: S.texts });
 const setMisc = (k, v) => { S.misc[k] = v; S.misc.u = now(); saveState("misc"); };
 
 function setStatus() {
@@ -1934,10 +1945,12 @@ function renderSession() {
   let body = "";
   if (it.k === "mc") body = "<p class=q>" + it.q + "</p><div class=opts>" + it.o.map((o, k) => "<button class=opt data-o='" + k + "'><span class=key>" + "abcd"[k] + ")</span> " + o + "</button>").join("") + "</div>";
   else if (it.k === "fill") {
-    let b = 0;
-    body = "<p class=q>" + it.q.split("___").map((p, k, arr) => p + (k < arr.length - 1 ? "<input class='ans' data-b='" + (b++) + "' autocomplete='off' autocapitalize='off' autocorrect='off' spellcheck='false' aria-label='odpowiedź'>" : "")).join("") + "</p>"
+    let b = 0; const pen = PEN(), many = it.a.length > 1;
+    body = "<p class=q>" + it.q.split("___").map((p, k, arr) => p + (k < arr.length - 1 ? (pen ? "<span class=gap>" + (many ? "(" + (++b) + ") " : "") + "_____</span>" : "<input class='ans' data-b='" + (b++) + "' autocomplete='off' autocapitalize='off' autocorrect='off' spellcheck='false' aria-label='odpowiedź'>") : "")).join("") + "</p>"
       + (it.hint ? "<p class='mut small'>" + it.hint + "</p>" : "")
-      + "<div class=row>" + (it.listen ? "<button class='btn' data-say='1'>Posłuchaj jeszcze raz</button>" : "") + "<button class='btn pri' data-check>Sprawdź</button><button class='btn' data-giveup>Nie wiem</button></div>";
+      + (pen ? it.a.map((_, k) => "<div class=padwrap>" + (many ? "<span class=padn>(" + (k + 1) + ")</span>" : "") + "<canvas class=pad data-pad='" + k + "' aria-label='pole do pisania rysikiem'></canvas></div>").join("")
+        + "<div class=row>" + (it.listen ? "<button class='btn' data-say='1'>Posłuchaj</button>" : "") + "<button class='btn pri' data-pcheck>Sprawdź</button><button class=btn data-padclear>Wyczyść</button><button class='btn' data-giveup>Nie wiem</button><button class='btn sm' data-input=keys>Klawiatura</button></div>"
+        : "<div class=row>" + (it.listen ? "<button class='btn' data-say='1'>Posłuchaj jeszcze raz</button>" : "") + "<button class='btn pri' data-check>Sprawdź</button><button class='btn' data-giveup>Nie wiem</button>" + (DEV.seenPen ? "<button class='btn sm' data-input=pen>Pisz rysikiem</button>" : "") + "</div>");
   }
   else if (it.k === "anag") {
     body = "<p class=q>" + it.q + "</p><div class=built id=built>&nbsp;</div><div class=letters>" + shuf(it.ans.split("").map((c, k) => [c, k])).map(([c, k]) => "<button class=opt data-l='" + k + "'>" + esc(c) + "</button>").join("") + "</div><div class=row><button class='btn' data-undo>Cofnij</button><button class='btn pri' data-check>Sprawdź</button><button class='btn' data-giveup>Nie wiem</button></div>";
@@ -1945,13 +1958,61 @@ function renderSession() {
   else if (it.k === "flash") {
     const s = srsGet(it.ref); const prod = s && s.b >= 2 && it.word.pl;
     it.prod = prod;
-    body = prod ? "<div class=flash><p class=mut>Jak to jest po włosku?</p><div class=w>" + esc(it.word.pl) + "</div></div><div class=row><input class='ans' data-b='0' placeholder='wpisz albo pokaż' autocomplete='off' autocapitalize='off' spellcheck='false'><button class='btn pri' data-show>Pokaż</button></div>"
+    body = prod ? "<div class=flash><p class=mut>Jak to jest po włosku?</p><div class=w>" + esc(it.word.pl) + "</div></div>" + (PEN() ? "<div class=padwrap><canvas class=pad data-pad=0 aria-label='pole do pisania rysikiem'></canvas></div><div class=row><button class='btn pri' data-show>Pokaż</button><button class=btn data-padclear>Wyczyść</button></div>" : "<div class=row><input class='ans' data-b='0' placeholder='wpisz albo pokaż' autocomplete='off' autocapitalize='off' spellcheck='false'><button class='btn pri' data-show>Pokaż</button></div>")
       : "<div class=flash><p class=mut>" + (s ? "Co to znaczy?" : "Nowe słówko") + "</p><div class=w>" + esc(it.word.it) + "</div></div><div class=row><button class='btn pri' data-show>Pokaż znaczenie</button>" + (canSpeak() ? "<button class=btn data-say='1'>Posłuchaj</button>" : "") + "</div>";
   }
   const diceH = it.dice ? "<div class=dice>" + it.dice.map((d, k) => "<div><span class=mut>" + ["czasownik", "osoba", "czas"][k] + "</span><b>" + esc(d) + "</b></div>").join("") + "</div>" : "";
   v.innerHTML = "<div class=meta><span>" + esc(SES.title) + (SES.mult > 1 ? " · punkty ×" + SES.mult : "") + "</span><span>" + (SES.sprint ? "<b id=tleft>" + Math.max(0, Math.ceil((SES.deadline - now()) / 1000)) + " s</b> · " + SES.ok + " dobrze" : (SES.i + 1) + " / " + (SES.more ? "∞" : n) + " · dobrze " + SES.ok) + "</span></div>" + (SES.sprint || SES.more ? "" : "<div class=prog><i style='width:" + (100 * SES.i / n) + "%'></i></div>") + "<div class=card id=card>" + diceH + body + "<div class=fb id=fb></div></div><div class=row><button class='btn sm' data-quit>Zakończ trening</button></div>";
   const inp = v.querySelector("input.ans"); if (inp) setTimeout(() => inp.focus(), 30);
+  setupPads(v); SES.pend = false;
   if (it.listen) setTimeout(() => speak(it.listen), 200);
+}
+/* ====== pismo odręczne (rysik) ====== */
+function setupPads(root) {
+  root.querySelectorAll("canvas.pad").forEach(c => {
+    const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+    c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+    const ctx = c.getContext("2d"); ctx.scale(dpr, dpr);
+    const ink = getComputedStyle(c).color; ctx.strokeStyle = ink; ctx.fillStyle = ink; ctx.lineWidth = 2.6; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    let down = false, last = null; c._ink = false;
+    const pt = (e, r) => [e.clientX - r.left, e.clientY - r.top];
+    c.addEventListener("pointerdown", e => { if (e.pointerType === "pen") notePen(); down = true; try { c.setPointerCapture(e.pointerId); } catch (x) {} const r = c.getBoundingClientRect(); last = pt(e, r); ctx.beginPath(); ctx.arc(last[0], last[1], 1.3, 0, 7); ctx.fill(); c._ink = true; e.preventDefault(); });
+    c.addEventListener("pointermove", e => { if (!down) return; const r = c.getBoundingClientRect(); const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]; (evs.length ? evs : [e]).forEach(ev => { const p = pt(ev, r); ctx.beginPath(); ctx.moveTo(last[0], last[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); last = p; }); e.preventDefault(); });
+    const up = () => { down = false; }; c.addEventListener("pointerup", up); c.addEventListener("pointercancel", up);
+  });
+}
+function padBlob(c) { return new Promise(r => { const t = document.createElement("canvas"); t.width = c.width; t.height = c.height; const x = t.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, t.width, t.height); x.filter = getComputedStyle(document.body).backgroundColor === "rgb(255, 255, 255)" ? "none" : "invert(1)"; x.drawImage(c, 0, 0); t.toBlob(r, "image/png"); }); }
+function notePen() {
+  if (DEV.seenPen && DEV.input) return;
+  DEV.seenPen = 1;
+  if (!DEV.input) { DEV.input = "pen"; toast("Wykryłem rysik — na tym urządzeniu odpowiadasz pismem odręcznym. Zmienisz to w zakładce Postęp."); if (inSession() && !SES.done && cur().k === "fill") setTimeout(renderSession, 50); }
+  saveDev();
+}
+document.addEventListener("pointerdown", e => { if (e.pointerType === "pen") notePen(); }, true);
+async function penCheck() {
+  const it = cur(); if (SES.done || SES.pend) return;
+  const pads = [...document.querySelectorAll("#card canvas.pad")];
+  if (!pads.some(p => p._ink)) { toast("Napisz odpowiedź rysikiem albo dotknij „Nie wiem”."); return; }
+  const correct = it.a.map(a => esc(firstAlt(a))).join(" · ");
+  const also = it.a.some(a => String(a).split("|").length > 1) ? "<div class='mut small'>Też dobrze: " + it.a.map(a => String(a).split("|").slice(1).map(esc).join(", ")).filter(Boolean).join(" · ") + "</div>" : "";
+  SES.pend = true;
+  if (SAMPLE) {
+    $("#fb").innerHTML = "<p class=mut>Claude odczytuje Twoje pismo…</p>";
+    try {
+      const imgs = await Promise.all(pads.map(padBlob));
+      const r = await SAMPLE.json("Each image shows one short handwritten answer (an Italian word or phrase) written with a stylus by a language learner. Transcribe exactly what is written, letter by letter, keeping accents and apostrophes, without correcting any mistakes. Return only a JSON array of " + pads.length + " strings in image order; use \"\" for an empty or unreadable image.", { images: imgs, modelTier: "quick" });
+      if (Array.isArray(r) && r.length === pads.length && cur() === it) {
+        let all = 1, acc = false; r.forEach((t, k) => { const m = match(String(t || ""), it.a[k]); if (!m) all = 0; if (m === 1) acc = true; });
+        SES.pend = false;
+        feedback(all ? (acc ? 1 : 2) : 0, "<span class='small mut'>Odczytałem: </span><i>" + r.map(x => esc(x || "?")).join(" · ") + "</i><br>" + (all && !acc ? "" : "Poprawnie: " + correct) + also, it, r.join(" / "));
+        $("#fb").insertAdjacentHTML("beforeend", "<p class='small mut'>Źle odczytałem? <button class='btn sm' data-override='" + (all ? 0 : 1) + "'>" + (all ? "Jednak miałem źle" : "Jednak miałem dobrze") + "</button></p>");
+        return;
+      }
+    } catch (e) {}
+  }
+  if (cur() !== it) return;
+  $("#fb").innerHTML = "<div class=answer>Poprawnie: " + correct + "</div>" + also + "<p class=mut>Porównaj ze swoim zapisem. Jak poszło?</p><div class=row><button class=btn data-selfg=0>Źle <span class=key>(n)</span></button><button class='btn pri' data-selfg=2>Dobrze <span class=key>(w)</span></button></div>";
+  SES.corr = "Poprawnie: " + correct + also;
 }
 function feedback(ok, correctHTML, it, userAns) {
   SES.done = true;
@@ -2004,6 +2065,12 @@ async function explainWhy() {
 }
 
 document.addEventListener("click", ev => {
+  const b = ev.target.closest("[data-input]"); if (!b) return;
+  DEV.input = b.dataset.input; if (DEV.input === "pen") DEV.seenPen = 1; saveDev();
+  ev.stopImmediatePropagation();
+  if (inSession() && !SES.done) renderSession(); else rerender();
+}, true);
+document.addEventListener("click", ev => {
   const t = ev.target.closest("button,[data-go]"); if (!t) return;
   if (t.dataset.go) { location.hash = t.dataset.go; return; }
   if (location.hash === "#trening" && SES) {
@@ -2017,6 +2084,17 @@ document.addEventListener("click", ev => {
       feedback(k === it.a ? 2 : 0, "", it, k); return;
     }
     if (t.hasAttribute("data-check")) { check(false); return; }
+    if (t.hasAttribute("data-pcheck")) { penCheck(); return; }
+    if (t.hasAttribute("data-padclear")) { document.querySelectorAll("#card canvas.pad").forEach(c => { const x = c.getContext("2d"); x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.width, c.height); x.restore(); c._ink = false; }); return; }
+    if (t.dataset.selfg != null && SES.pend && !SES.done) { SES.pend = false; feedback(+t.dataset.selfg, SES.corr, it, null); return; }
+    if (t.dataset.override != null && SES.done) {
+      const ok = t.dataset.override === "1";
+      if (it.key) { S.res[it.key] = ok ? 1 : 0; S.resT[it.key] = now(); saveState("res"); saveState("resT"); }
+      if (it.ref) grade(it.ref, ok ? 2 : 0);
+      if (ok) { SES.ok++; SES.wrong = SES.wrong.filter(x => x !== it); addXP(9); } else { SES.ok--; SES.wrong.push(it); }
+      const vd = document.querySelector("#fb .verdict"); if (vd) { vd.textContent = ok ? "✓ Dobrze (poprawione ręcznie)" : "✗ Źle (poprawione ręcznie)"; vd.classList.toggle("bad", !ok); }
+      t.parentElement.remove(); return;
+    }
     if (t.hasAttribute("data-giveup")) { check(true); return; }
     if (t.hasAttribute("data-next")) { SES.i++; if (SES.more && SES.i >= SES.items.length - 1) SES.items = SES.items.concat(SES.more(5)); if (SES.i >= SES.items.length) SES.end = true; renderSession(); window.scrollTo(0, 0); return; }
     if (t.dataset.say) { speak(t.dataset.say === "1" && it.listen ? it.listen : it.say || (it.word && it.word.it)); return; }
@@ -2041,6 +2119,7 @@ document.addEventListener("keydown", ev => {
   const it = SES.items[SES.i]; const key = ev.key.toLowerCase();
   const click = sel => { const b = document.querySelector(sel); if (b && !b.disabled) { ev.preventDefault(); b.click(); return true; } return false; };
   if (!inField && it) {
+    if (SES.pend && !SES.done) { const g = { n: 0, w: 2 }[key]; if (g != null) { click("[data-selfg='" + g + "']"); return; } }
     if (it.k === "mc" && !SES.done) { const k = "abcd1234".indexOf(key); if (k >= 0) { click("#card [data-o='" + (k % 4) + "']"); return; } }
     if (it.k === "flash") { if (!SES.done && (key === " " || key === "enter")) { click("[data-show]"); return; } if (SES.done) { const g = { n: 0, t: 1, w: 2, "1": 0, "2": 1, "3": 2 }[key]; if (g != null) { click("[data-g='" + g + "']"); return; } } }
     if (it.k === "anag" && !SES.done) {
@@ -2097,7 +2176,7 @@ async function enrich(ids, out) {
 }
 async function loadPdfJs() {
   if (window.pdfjsLib) return window.pdfjsLib;
-  const CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+  const CDN = window.PDFJS_BASE || "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
   const load = src => new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
   await load(CDN + "pdf.worker.min.js"); // działa w głównym wątku (pdfjsWorker), bez osobnego workera
   await load(CDN + "pdf.min.js");
@@ -2131,26 +2210,149 @@ async function fileToImages(file, out) {
   }
   return imgs;
 }
-let IMPORT = null;
-async function readNotes(files, out) {
-  if (!SAMPLE) return;
-  try {
-    let imgs = [];
-    for (const f of files) imgs = imgs.concat(await fileToImages(f, out));
-    if (!imgs.length) { out.textContent = "Nie znalazłem stron do odczytania."; return; }
-    const lim = await SAMPLE.limits(); const max = (lim && lim.maxImages) || 8;
-    imgs = imgs.slice(0, max);
-    out.textContent = "Claude czyta notatki (" + imgs.length + " " + (imgs.length === 1 ? "strona" : "str.") + ")… to może potrwać do minuty.";
-    const topics = G.map(t => t.id + " = " + t.n).join("; ");
-    const r = await SAMPLE.json("These images are pages of a Polish learner's handwritten notes from Italian lessons (Polish and Italian, may contain spelling mistakes). Extract every vocabulary entry: the Italian word or phrase and its Polish meaning as written. If the meaning is missing or is a question mark, use \"\". Correct only obvious Italian misspellings. Ignore dates and crossed-out text. Also list grammar topics the learner wants to practise, choosing ids only from this list: " + topics + ". Return JSON: {\"words\":[{\"it\":\"\",\"pl\":\"\"}],\"topics\":[\"id\"],\"other\":\"one short Polish sentence about other content in the notes (e.g. example sentences), or empty\"}. Return only JSON.", { images: imgs, modelTier: "default" });
-    const words = (r && Array.isArray(r.words) ? r.words : []).filter(x => x && x.it).map(x => ({ it: String(x.it), pl: String(x.pl || ""), on: true }));
-    IMPORT = { words, topics: (r && Array.isArray(r.topics) ? r.topics : []).filter(id => G.some(t => t.id === id)), other: r && r.other ? String(r.other) : "" };
-    out.textContent = words.length ? "Znalazłem " + SL(words.length) + ". Sprawdź listę i zapisz." : "Nie znalazłem słówek w tych notatkach.";
-    rerender();
-  } catch (e) {
-    out.textContent = e && e.code === "not_granted" ? "Dostęp do Claude jest wyłączony w tym widoku." : e && e.code === "rate_limited" ? "Za dużo zapytań — spróbuj za chwilę." : "Nie udało się odczytać pliku. Spróbuj wyeksportować stronę z BOOX jako PNG.";
+let IMPORT = null, IMPKIND = "words";
+async function pdfText(file) {
+  const lib = await loadPdfJs();
+  const pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  let boox = false; try { const m = await pdf.getMetadata(); boox = /boox|neopdf|onyx/i.test(((m.info || {}).Creator || "") + " " + ((m.info || {}).Producer || "")); } catch (e) {}
+  let out = "";
+  for (let p = 1; p <= Math.min(pdf.numPages, 40); p++) {
+    const tc = await (await pdf.getPage(p)).getTextContent(); let lastY = null;
+    tc.items.forEach(i => { const y = i.transform ? Math.round(i.transform[5]) : null; if (lastY != null && y != null && Math.abs(y - lastY) > 2 && !/\n$/.test(out)) out += "\n"; out += i.str; if (i.hasEOL) out += "\n"; lastY = y; });
+    out += "\n";
   }
+  return { text: out.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(), boox };
 }
+/* plik → słówka albo tekst do ćwiczeń. PDF z tekstem i TXT działają bez Claude; pismo odręczne i zdjęcia czyta Claude. */
+async function importFiles(files, kind, out) {
+  let text = "", imgs = [], names = [], boox = false;
+  try {
+    for (const f of files) {
+      names.push(f.name.replace(/\.[a-z0-9]+$/i, ""));
+      if (/\.txt$/i.test(f.name) || /^text\//.test(f.type)) { text += (await f.text()) + "\n"; continue; }
+      if (/pdf/i.test(f.type) || /\.pdf$/i.test(f.name)) {
+        out.textContent = "Otwieram PDF…";
+        const r = await pdfText(f); const t = r.text;
+        /* notatki z BOOX-a mają automatyczną, zwykle błędną warstwę tekstu — gdy jest Claude, czytamy samo pismo */
+        if (t.replace(/\s/g, "").length > 25 && !(r.boox && SAMPLE)) { text += t + "\n"; if (r.boox) boox = true; continue; }
+        if (SAMPLE) imgs = imgs.concat(await fileToImages(f, out));
+        else { out.textContent = "Ten PDF to pismo odręczne bez warstwy tekstu. Na BOOX-ie zamień notatkę na tekst (funkcja rozpoznawania pisma) i wyeksportuj ją jako TXT albo PDF z tekstem — albo wgraj ją w wersji na claude.ai, gdzie Claude odczyta pismo."; return; }
+        continue;
+      }
+      if (/^image\//.test(f.type)) { if (SAMPLE) imgs = imgs.concat(await fileToImages(f, out)); else { out.textContent = "Zdjęcia odczytuje Claude — w tej wersji wgraj TXT albo PDF z tekstem."; return; } }
+    }
+  } catch (e) { out.textContent = "Nie mogę otworzyć pliku" + (OFFLINE ? " (pierwsze otwarcie PDF-a wymaga internetu)." : "."); return; }
+  const title = names.join(", ") || "Tekst " + today();
+  if (imgs.length) {
+    try {
+      const lim = await SAMPLE.limits(); imgs = imgs.slice(0, (lim && lim.maxImages) || 8);
+      out.textContent = "Claude czyta pismo (" + imgs.length + " str.)… to może potrwać do minuty.";
+      if (kind === "text") {
+        const r = await SAMPLE.json("These images are pages written by hand or printed, in Italian (maybe with Polish notes). Transcribe the Italian text faithfully as plain text, keeping sentences and paragraphs; skip Polish notes, dates and crossed-out words. Return JSON: {\"text\":\"...\"}. Return only JSON.", { images: imgs, modelTier: "default" });
+        text += (r && r.text ? String(r.text) : "");
+      } else {
+        const topics = G.map(t => t.id + " = " + t.n).join("; ");
+        const r = await SAMPLE.json("These images are pages of a Polish learner's handwritten notes from Italian lessons (Polish and Italian, may contain spelling mistakes). Extract every vocabulary entry: the Italian word or phrase and its Polish meaning as written. If the meaning is missing or is a question mark, use \"\". Correct only obvious Italian misspellings. Ignore dates and crossed-out text. Also list grammar topics the learner wants to practise, choosing ids only from this list: " + topics + ". Return JSON: {\"words\":[{\"it\":\"\",\"pl\":\"\"}],\"topics\":[\"id\"],\"other\":\"one short Polish sentence about other content in the notes (e.g. example sentences), or empty\"}. Return only JSON.", { images: imgs, modelTier: "default" });
+        const words = (r && Array.isArray(r.words) ? r.words : []).filter(x => x && x.it).map(x => ({ it: String(x.it), pl: String(x.pl || ""), on: true }));
+        IMPORT = { words: (IMPORT && IMPORT.words || []).concat(words), topics: (r && Array.isArray(r.topics) ? r.topics : []).filter(id => G.some(t => t.id === id)), other: r && r.other ? String(r.other) : "" };
+      }
+    } catch (e) { out.textContent = e && e.code === "rate_limited" ? "Za dużo zapytań — spróbuj za chwilę." : "Nie udało się odczytać pisma."; return; }
+  }
+  if (kind === "text") {
+    text = text.trim(); if (text.length < 20) { out.textContent = "Nie znalazłem tekstu w pliku."; return; }
+    const id = saveText(title, text); const n = textCands(S.texts[id]).length;
+    out.textContent = "Zapisano tekst „" + title + "”: " + pl3(n, "zadanie", "zadania", "zadań") + " do zrobienia." + (boox ? " Tekst pochodzi z automatycznego rozpoznawania pisma BOOX — jeśli zadania wyglądają dziwnie, popraw notatkę w BOOX-ie (zamiana na tekst) albo wklej poprawiony tekst." : "");
+    rerender(); return;
+  }
+  if (text) {
+    const all = parsePaste(text).filter(x => x.it.length < 60);
+    const withSep = all.filter(x => x.sep);
+    const words = withSep.length >= 2 || boox ? withSep : all.filter(x => x.it.split(" ").length <= 3 && !/\d/.test(x.it));
+    IMPORT = { words: (IMPORT && IMPORT.words || []).concat(words), topics: IMPORT ? IMPORT.topics : [], other: IMPORT ? IMPORT.other : "" };
+  }
+  const n = IMPORT ? IMPORT.words.length : 0;
+  out.textContent = n ? "Znalazłem " + SL(n) + ". Sprawdź listę i zapisz." : "Nie znalazłem słówek. Lista powinna mieć format „parola - tłumaczenie”, jedno w linii. Jeśli to zwykły tekst, wybierz „Tekst do ćwiczeń”.";
+  rerender();
+}
+
+/* ====== moje teksty → zadania ====== */
+function saveText(title, body) { const id = "x" + uid().slice(1); S.texts[id] = { id, title: String(title).slice(0, 80), body: String(body).slice(0, 30000), t: now(), u: now() }; saveState("texts"); return id; }
+function delText(id) { delete S.texts[id]; S.del[id] = now(); saveState("texts"); saveState("del"); }
+const SAMPLE_TEXT = ["Panda — przykładowy tekst", "La settimana scorsa ho trovato un annuncio molto interessante: un signore di Bologna vendeva una Fiat Panda del 1989. Siccome cercavo una macchina così da anni, l'ho chiamato subito. Mi ha detto che la macchina era sempre stata in garage e che aveva solo centomila chilometri. Benché il prezzo fosse un po' alto, ho deciso di andare a vederla. Quando sono arrivato, il venditore mi aspettava davanti a casa. La carrozzeria era in buone condizioni, ma sotto i tappetini c'era un po' di ruggine. Abbiamo fatto un giro di prova e il motore funzionava benissimo. Alla fine abbiamo trattato sul prezzo: mi ha detto che, se avessi pagato in contanti, mi avrebbe fatto uno sconto. Gli ho lasciato una caparra e domani andremo insieme all'agenzia per il passaggio di proprietà. Non vedo l'ora di guidarla fino in Polonia, anche se il viaggio sarà lungo!"];
+let RIDX = null, RIDXn = -1;
+const ARTP = new Set("il lo la i gli le un uno una di del dello della dei degli delle a al allo alla ai agli alle da dal dalla dai in nel nello nella nei negli nelle su sul sulla sui con per tra fra questo questa questi queste quel quello quella quei quelle mio mia miei mie tuo tua suo sua nostro nostra vostro vostra loro ogni qualche molto molta poco poca tanto tanta".split(" "));
+const AUXT = { pres: "pp", impf: "trp", fut: "futa", cond: "condp", cpres: "cpass", cimp: "ctrp" };
+const STOP = new Set(["fa", "porta", "porte", "stato", "stati", "come", "ora", "dato", "visto", "prima", "dopo", "sera", "sono", "era", "ero", "erano", "eri", "e", "dai", "dà", "tema", "volta", "parte", "conto", "pare", "vale", "mancare", "detto", "fatto"]);
+function ridx() {
+  const mine = myVerbs();
+  if (RIDX && RIDXn === mine.length) return RIDX;
+  const idx = new Map(), part = new Map(), aux = new Map();
+  const verbs = [...new Set(V.CORE.map(x => x[0]).concat(mine.map(v => v.inf)))];
+  verbs.forEach(inf => {
+    let c; try { c = V.conj(inf); } catch (e) { return; }
+    ["pres", "impf", "fut", "cond", "pr", "cpres", "cimp"].forEach(t => c.T[t].forEach((f, p) => f.split("|").forEach(x => { const w = x.split(" ").pop(); if (w.length > 2 && !idx.has(w)) idx.set(w, { inf, t, p }); })));
+    c.pp.split("/")[0].split("|").forEach(x => { const st = x.slice(0, -1); "oaie".split("").forEach(e => { if (!part.has(st + e)) part.set(st + e, inf); }); });
+  });
+  ["avere", "essere"].forEach(a => { const c = V.conj(a); Object.keys(AUXT).forEach(t => c.T[t].forEach((f, p) => f.split("|").forEach(x => aux.set(x, { t: AUXT[t], p, a })))); });
+  RIDX = { idx, part, aux }; RIDXn = mine.length; return RIDX;
+}
+const CONNW = () => CONN ? CONN.DECK.map(d => d[0]).filter(w => w.length > 2 && !["per", "dopo", "come", "anche", "mentre", "anzi", "quando"].includes(w)).sort((a, b) => b.length - a.length) : [];
+function textCands(tx) {
+  if (!tx) return [];
+  const R = ridx(), out = [];
+  const sents = tx.body.replace(/\s+/g, " ").split(/(?<=[.!?…])\s+/).map(x => x.trim()).filter(x => x.split(" ").length >= 4 && x.length < 400);
+  const vocab = userWords().map(w => [bare(expandIt(w.it)[0]), w]).filter(([b]) => b.length >= 4);
+  const cw = CONNW();
+  sents.forEach((sn, si) => {
+    const toks = sn.match(/[A-Za-zÀ-ÿ]+|[^A-Za-zÀ-ÿ]+/g) || [];
+    const words = toks.map((t, i) => [t, i]).filter(([t]) => /[A-Za-zÀ-ÿ]/.test(t));
+    for (let k = 0; k < words.length; k++) {
+      const [t, i] = words[k]; const lw = t.toLowerCase();
+      const nx = words[k + 1];
+      if (R.aux.has(lw) && nx && R.part.has(nx[0].toLowerCase())) {
+        const a = R.aux.get(lw); const inf = R.part.get(nx[0].toLowerCase());
+        out.push({ s: si, kind: "v", from: i, to: nx[1], inf, t: a.t, p: a.p, sn, toks }); k++; continue;
+      }
+      if (STOP.has(lw) || lw.length < 3) continue;
+      const pv = k > 0 ? words[k - 1][0].toLowerCase() : "";
+      const v = R.idx.get(lw); if (v && !(/^[A-Z]/.test(t) && k > 0) && !ARTP.has(pv) && !/['’]$/.test(toks[i - 1] || "")) { out.push({ s: si, kind: "v", from: i, to: i, inf: v.inf, t: v.t, p: v.p, sn, toks }); continue; }
+    }
+    const low = sn.toLowerCase();
+    cw.forEach(c => { const m = low.match(new RegExp("(^|[^a-zà-ÿ])(" + c.replace(/'/g, "'") + ")(?=[^a-zà-ÿ]|$)")); if (m) out.push({ s: si, kind: "c", at: m.index + m[1].length, len: c.length, w: c, sn }); });
+    vocab.forEach(([b, w]) => { const m = low.match(new RegExp("(^|[^a-zà-ÿ])(" + b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[a-zà-ÿ]{0,2})(?=[^a-zà-ÿ]|$)")); if (m && w.pl) out.push({ s: si, kind: "w", at: m.index + m[1].length, len: m[2].length, w, sn }); });
+  });
+  return out.filter((c, i, a) => c.kind !== "c" || !a.some(d => d !== c && d.kind === "c" && d.s === c.s && d.at <= c.at && d.at + d.len >= c.at + c.len && d.len > c.len));
+}
+function textItem(c, tx) {
+  const src = "<span class='small mut'>z tekstu: " + esc(tx.title) + "</span><br>";
+  if (c.kind === "v") {
+    const orig = c.toks.slice(c.from, c.to + 1).join("");
+    const q = c.toks.slice(0, c.from).join("") + "___ (" + c.inf + ")" + c.toks.slice(c.to + 1).join("");
+    const person = c.t === "imp" ? "" : V.PERS[c.p];
+    return { k: "fill", cat: "text", q: src + esc(q).replace("___", "___"), a: [orig], e: "Czas: <b>" + (TN[c.t] ? TN[c.t].n : c.t) + "</b>, osoba: " + person + ". Czasownik: " + esc(c.inf) + ".", say: c.sn };
+  }
+  if (c.kind === "c") {
+    const orig = c.sn.substr(c.at, c.len); const q = c.sn.slice(0, c.at) + "___" + c.sn.slice(c.at + c.len);
+    const d = CONN.DECK.find(x => x[0] === c.w); const cat = d ? d[1] : "";
+    const bad = shuf(CONN.DECK.filter(x => x[1] !== cat && x[0].length > 2).map(x => x[0])).filter((x, i, a) => a.indexOf(x) === i).slice(0, 3);
+    const cap1 = w => /^[A-ZÀ-Ý]/.test(orig) ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+    const o = shuf([orig].concat(bad.map(cap1)));
+    return { k: "mc", cat: "text", q: src + "Wybierz łącznik:<br><i>" + esc(q) + "</i>", o: o.map(esc), a: o.indexOf(orig), e: d ? esc(c.w) + " — " + esc(d[1]) + ". " + esc(d[2]) : "", say: c.sn };
+  }
+  const orig = c.sn.substr(c.at, c.len); const q = c.sn.slice(0, c.at) + "___" + c.sn.slice(c.at + c.len);
+  return { k: "fill", cat: "text", q: src + esc(q) + "<br><span class=mut>(" + esc(c.w.pl) + ")</span>", a: [orig], e: "<b>" + esc(c.w.it) + "</b> — " + esc(c.w.pl), say: c.sn };
+}
+function buildText(ids, n) {
+  let cands = [];
+  (ids || Object.keys(S.texts)).forEach(id => { const tx = S.texts[id]; if (tx) textCands(tx).forEach(c => cands.push([c, tx])); });
+  if (!cands.length) return [];
+  const used = new Set(); const out = [];
+  const pref = shuf(cands.filter(([c]) => c.kind === "v")).concat(shuf(cands.filter(([c]) => c.kind !== "v")));
+  for (const [c, tx] of shuf(pref.slice(0, Math.max(n * 2, 30)))) { const k = tx.id + ":" + c.s + ":" + c.kind; if (used.has(k) && used.size < cands.length) continue; used.add(k); out.push(textItem(c, tx)); if (out.length >= n) break; }
+  return out;
+}
+GEN.GENS.texts = { n: "Z moich tekstów", f: () => buildText(null, 1)[0] || null };
+
 async function genExercises(t, n, useWords, out) {
   if (!SAMPLE) return;
   out.textContent = "Claude układa " + n + " nowych zadań… to może potrwać do minuty.";
@@ -2264,7 +2466,7 @@ function vGry() {
 }
 const VERBS_N = () => 120 + myVerbs().length;
 function statFor(k) {
-  const cats = { tense: Object.keys(TN), ipo: ["ipo"], ipoT: ["ipoT"], indcong: ["indcong"], ppimpf: ["ppimpf"], aux: ["aux"], pron: ["pron"], futcond: ["futcond"], dice: ["dice"] }[k] || [k];
+  const cats = { tense: Object.keys(TN), ipo: ["ipo"], ipoT: ["ipoT"], indcong: ["indcong"], ppimpf: ["ppimpf"], aux: ["aux"], pron: ["pron"], futcond: ["futcond"], dice: ["dice"], texts: ["text"], conn: ["conn"] }[k] || [k];
   let ok = 0, all = 0; cats.forEach(c => { const a = S.stat[c]; if (a) { ok += a[0]; all += a[1]; } });
   return all ? "zrobione " + all + " · dobrze " + Math.round(100 * ok / all) + "%" : "";
 }
@@ -2275,7 +2477,7 @@ function parsePaste(txt) {
     const m = l.match(/^(.+?)\s*(?:\s[-–—=]\s|\t|:\s|\s[-–—]$|[-–—]\s)\s*(.*)$/);
     let it = m ? m[1] : l, pl = m ? m[2] : "";
     pl = pl.replace(/^\(?\?+\)?$/, "").replace(/\s*\(\?\)\s*$/, "").trim();
-    return { it: it.trim(), pl, on: true };
+    return { it: it.trim(), pl, on: true, sep: !!m };
   }).filter(x => x.it);
 }
 function vSlowka() {
@@ -2284,7 +2486,7 @@ function vSlowka() {
   const missing = Object.values(S.words).filter(w => !w.ai).length;
   let h = "<h1>Słówka</h1>" + (OUT.eout ? "<p class=note id=eout>" + esc(OUT.eout) + "</p>" : "");
   h += trainBox("tv", ds.filter(d => !d.panda), user.length ? [user[0].id] : ["b:verbs"], "Trening");
-  h += "<h2>Dodaj nowe słówka</h2><div class=chips>" + [["paste", "Wklej listę"], ["notes", "Z notatek (PDF / zdjęcie)"], ["one", "Jedno słowo"]].map(([k, n]) => "<button class='chk" + (addTab === k ? " on" : "") + "' data-tab='" + k + "'>" + n + "</button>").join("") + "</div>";
+  h += "<h2>Dodaj nowe słówka</h2><div class=chips>" + [["paste", "Wklej listę"], ["notes", "Z pliku (PDF / TXT" + (SAMPLE ? " / zdjęcie" : "") + ")"], ["texts", "Wklej tekst"], ["one", "Jedno słowo"]].map(([k, n]) => "<button class='chk" + (addTab === k ? " on" : "") + "' data-tab='" + k + "'>" + n + "</button>").join("") + "</div>";
   const deckFld = (id, val) => "<div class=fld><label for='" + id + "'>Zestaw</label><input id='" + id + "' list='decklist' value='" + esc(val) + "'><datalist id=decklist>" + user.map(d => "<option value='" + esc(d.n) + "'>").join("") + "</datalist></div>";
   if (addTab === "paste") {
     h += "<div class=box><p class=small>Jedno słówko w linii, tak jak w zeszycie: <b>la collina - wzgórze</b>. Separator: myślnik, dwukropek albo tabulator. Gdy nie znasz znaczenia, wpisz „?” albo nic — Claude uzupełni.</p>"
@@ -2293,16 +2495,24 @@ function vSlowka() {
     if (PASTE && PASTE.length) h += importTable(PASTE, "paste");
     h += "</div>";
   } else if (addTab === "notes") {
-    h += "<div class=box>" + (SAMPLE ? "<p class=small>Wyeksportuj notatkę z BOOX-a jako PDF albo PNG i wybierz plik. Claude odczyta pismo odręczne, wypisze słówka i uzupełni brakujące znaczenia. Przed zapisem sprawdzisz listę.</p>"
-      + "<div class=fld><label for=nfile>Plik z notatkami</label><input id=nfile type=file accept='application/pdf,image/*' multiple></div>" + deckFld("ndeck", defDeck)
-      + "<div class=row><button class='btn pri' data-act=readnotes>Odczytaj notatki</button></div>" + outP("nout")
-      + (IMPORT ? (IMPORT.topics.length ? "<p>W notatkach są też tematy do ćwiczeń: " + IMPORT.topics.map(id => { const t = G.find(x => x.id === id); return "<a href='#g-" + id + "'>" + esc(t.n) + "</a>"; }).join(", ") + ".</p>" : "") + (IMPORT.other ? "<p class=mut>" + esc(IMPORT.other) + "</p>" : "") + importTable(IMPORT.words, "notes") : "")
-      : "<p>Odczytywanie notatek działa, gdy aplikacja jest otwarta na koncie Claude (claude.ai). W tym widoku Claude nie jest dostępny — wklej listę ręcznie.</p>") + "</div>";
+    h += "<div class=box><p class=small>Wgraj plik z lekcji. <b>PDF z tekstem i TXT</b> działają zawsze, także bez Claude. " + (SAMPLE ? "<b>Pismo odręczne i zdjęcia</b> odczyta Claude." : "Pismo odręczne odczytasz w wersji na claude.ai albo po zamianie notatki na tekst w BOOX-ie.") + "</p>"
+      + "<p class=small><b>Co jest w pliku?</b></p><div class=chips>" + [["words", "Lista słówek"], ["text", "Tekst do ćwiczeń"]].map(([k, n]) => "<button class='chk" + (IMPKIND === k ? " on" : "") + "' data-impkind='" + k + "'>" + n + "</button>").join("") + "</div>"
+      + "<p class='small mut'>" + (IMPKIND === "words" ? "Lista: jedno słówko w linii, np. „la collina - wzgórze”." : "Tekst: dowolny włoski tekst (artykuł, dialog, notatki). Aplikacja sama zrobi z niego zadania: czasowniki w zdaniach, łączniki i Twoje słówka.") + "</p>"
+      + "<div class=fld><label for=nfile>Plik</label><input id=nfile type=file accept='application/pdf,text/plain,.txt" + (SAMPLE ? ",image/*" : "") + "' multiple></div>" + (IMPKIND === "words" ? deckFld("ndeck", defDeck) : "")
+      + "<div class=row><button class='btn pri' data-act=readnotes>Wczytaj plik</button></div>" + outP("nout")
+      + (IMPORT && IMPKIND === "words" ? (IMPORT.topics.length ? "<p>W notatkach są też tematy do ćwiczeń: " + IMPORT.topics.map(id => { const t = G.find(x => x.id === id); return "<a href='#g-" + id + "'>" + esc(t.n) + "</a>"; }).join(", ") + ".</p>" : "") + (IMPORT.other ? "<p class=mut>" + esc(IMPORT.other) + "</p>" : "") + importTable(IMPORT.words, "notes") : "")
+      + "</div>";
+  } else if (addTab === "texts") {
+    h += "<div class=box><p class=small>Wklej włoski tekst — artykuł, dialog z lekcji, mail od sprzedawcy. Aplikacja wyszuka w nim czasowniki (we wszystkich czasach), łączniki i Twoje słówka i zrobi z nich zadania.</p>"
+      + "<div class=fld><label for=ttitle>Tytuł</label><input id=ttitle placeholder='np. Lekcja 25.11'></div><div class=fld><label for=tbody>Tekst po włosku</label><textarea id=tbody></textarea></div>"
+      + "<div class=row><button class='btn pri' data-act=savetext>Zapisz tekst</button>" + (Object.values(S.texts).some(x => x.title === SAMPLE_TEXT[0]) ? "" : "<button class=btn data-act=sampletext>Wczytaj przykładowy tekst o Pandzie</button>") + "</div>" + outP("tout") + "</div>";
   } else {
     h += "<div class=box><div class=fields><div class=fld><label for=oit>Po włosku</label><input id=oit autocapitalize=off></div><div class=fld><label for=opl>Po polsku (można zostawić puste)</label><input id=opl></div></div>" + deckFld("odeck", user[0] ? user[0].n : defDeck)
       + "<div class=row><button class='btn pri' data-act=addone>Dodaj</button></div></div>";
   }
   if (SAMPLE && missing) h += "<div class='box dash'><p><b>" + "Bez przykładu i sprawdzonego znaczenia: " + SL(missing) + "</b>. Claude może je uzupełnić: poprawi pisownię, doda znaczenie, przykład zdania i oznaczy czasowniki do odmiany.</p><div class=row><button class='btn pri' data-act=enrichall>Uzupełnij z Claude</button></div></div>";
+  const txs = Object.values(S.texts).sort((x, y) => y.t - x.t);
+  h += "<h2 id=teksty>Moje teksty</h2>" + (txs.length ? "<div class=scroll><table>" + txs.map(tx => { const n = textCands(tx).length; return "<tr><td><b>" + esc(tx.title) + "</b><br><span class='small mut'>" + pl3(n, "zadanie", "zadania", "zadań") + "</span></td><td style='text-align:right;white-space:nowrap'><button class='btn sm' data-txt='" + tx.id + "'>Ćwicz</button> <button class='btn sm' data-txtdel='" + tx.id + "'>Usuń</button></td></tr>"; }).join("") + "</table></div>" + (txs.length > 1 ? "<div class=row><button class='btn sm' data-txt=all>Ćwicz ze wszystkich tekstów</button></div>" : "") : "<p class='small mut'>Brak tekstów. Wklej tekst albo wgraj PDF/TXT jako „Tekst do ćwiczeń”.</p><div class=row><button class='btn sm' data-act=sampletext>Wczytaj przykładowy tekst o Pandzie</button></div>");
   h += "<h2 id=gotowe>Gotowe zestawy</h2><p class=small>Słownictwo z typowych działów B1–B2, handel i łączniki. „Fiszki” wprowadzają nowe słówka i pilnują powtórek, „Ćwicz” to mieszane zadania.</p><div class=scroll><table>" + ds.filter(d => !d.user && !d.panda).map(d => "<tr><td><b>" + esc(d.n) + "</b><br><span class='small mut'>" + esc(d.g) + " · " + d.c + "</span></td><td style='text-align:right;white-space:nowrap'><button class='btn sm' data-fl='" + esc(d.id) + "'>Fiszki</button> <button class='btn sm' data-quick='" + esc(d.id) + "'>Ćwicz</button></td></tr>").join("") + "</table></div>";
   h += "<h2>Twoje zestawy</h2>";
   if (!user.length) h += "<p class=mut>Jeszcze nic tu nie ma.</p><div class=row><button class=btn data-act=seed>Wczytaj 41 słówek z notatek 18.11.2026</button></div>";
@@ -2408,6 +2618,8 @@ function vPostep() {
   h += "<h2>Gramatyka</h2><table><tr><th>Temat</th><th style='text-align:right'>zrobione</th><th style='text-align:right'>dobrze</th></tr>" + G.map(t => { const s = topicScore(t); return "<tr><td><a href='#g-" + t.id + "'>" + esc(t.n) + "</a></td><td style='text-align:right'>" + s.done + "/" + s.total + "</td><td style='text-align:right'>" + (s.done ? Math.round(100 * s.ok / s.done) + "%" : "–") + "</td></tr>"; }).join("") + "</table>";
   h += "<h2>Ustawienia</h2><div class=fields><div class=fld><label for=npd>Nowych słówek dziennie</label><select id=npd>" + [5, 10, 15, 20, 30, 50].map(n => "<option" + (S.misc.newPerDay === n ? " selected" : "") + ">" + n + "</option>").join("") + "</select></div><div class=fld><label for=goal>Cel punktów na dzień</label><select id=goal>" + [50, 100, 150, 200, 300].map(n => "<option" + (S.misc.goal === n ? " selected" : "") + ">" + n + "</option>").join("") + "</select></div></div>"
     + "<div class=chips><label class='chk" + (S.misc.eink ? " on" : "") + "'><input type=checkbox id=eink" + (S.misc.eink ? " checked" : "") + ">Tryb e-ink (bez animacji)</label>" + (canSpeak() ? "<label class='chk" + (S.misc.autoSay ? " on" : "") + "'><input type=checkbox id=autosay" + (S.misc.autoSay ? " checked" : "") + ">Czytaj na głos odpowiedzi sprzedawcy</label>" : "") + "</div>";
+  h += "<h3>Jak odpowiadam na tym urządzeniu</h3><p class=small>Ustawienie dotyczy tylko tego urządzenia: np. rysik na BOOX-ie, klawiatura na telefonie. Gdy dotkniesz ekranu rysikiem, aplikacja sama przełączy się na pismo odręczne.</p><div class=chips><button class='chk" + (!PEN() ? " on" : "") + "' data-input=keys>Klawiatura</button><button class='chk" + (PEN() ? " on" : "") + "' data-input=pen>Rysik (pismo odręczne)</button></div>"
+    + (PEN() ? "<p class='small mut'>" + (SAMPLE ? "Twoje pismo odczytuje Claude i sam sprawdza odpowiedź." : "Bez Claude po napisaniu odpowiedzi zobaczysz poprawną wersję i sam ocenisz: dobrze (w) albo źle (n).") + "</p>" : "");
   h += "<h2>Synchronizacja i kopia</h2>";
   if (OFFLINE) {
     h += "<div class=box><h3>Automatycznie przez GitHub (darmowe)</h3>"
@@ -2513,7 +2725,12 @@ document.addEventListener("click", ev => {
     else rerender();
     return;
   }
-  if (a === "readnotes") { const f = $("#nfile"); if (!f.files.length) return toast("Wybierz plik."); t.disabled = true; readNotes([...f.files], outEl("nout")).then(() => { t.disabled = false; }); return; }
+  if (a === "readnotes") { const f = $("#nfile"); if (!f.files.length) return toast("Wybierz plik."); t.disabled = true; if (IMPKIND === "words") IMPORT = null; importFiles([...f.files], IMPKIND, outEl("nout")).then(() => { t.disabled = false; }); return; }
+  if (t.dataset.impkind) { IMPKIND = t.dataset.impkind; rerender(); return; }
+  if (a === "savetext") { const body = ($("#tbody").value || "").trim(); if (body.length < 20) return toast("Wklej dłuższy tekst."); const id = saveText(($("#ttitle").value || "").trim() || "Tekst " + today(), body); $("#tbody").value = ""; $("#ttitle").value = ""; outEl("tout").textContent = "Zapisano: " + pl3(textCands(S.texts[id]).length, "zadanie", "zadania", "zadań") + " z tego tekstu."; rerender(); return; }
+  if (a === "sampletext") { saveText(SAMPLE_TEXT[0], SAMPLE_TEXT[1]); toast("Dodano przykładowy tekst."); rerender(); return; }
+  if (t.dataset.txt) { const ids = t.dataset.txt === "all" ? null : [t.dataset.txt]; return startSession("Z moich tekstów", buildText(ids, 15), "#slowka", "W tym tekście nie znalazłem nic do ćwiczenia."); }
+  if (t.dataset.txtdel) { if (t.dataset.sure) { delText(t.dataset.txtdel); rerender(); } else { t.dataset.sure = 1; t.textContent = "Na pewno?"; } return; }
   if (a === "addone") {
     const it = $("#oit").value.trim(); if (!it) return toast("Wpisz słówko po włosku.");
     const w = { id: uid(), it, pl: $("#opl").value.trim(), deck: $("#odeck").value.trim() || "Moje słówka", t: now() }; if (V.isVerb(bare(it))) w.type = "v";
