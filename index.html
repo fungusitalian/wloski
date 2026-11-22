@@ -17,9 +17,9 @@
    COLOUR white paper, black ink, red pencil #b3161b for errors and marks; inverted black buttons for selection (reads well on e-ink)
    TYPE Literata (made for e-reading) for everything, weights 400/600/800
    LAYOUT one centred column up to 880px, nav that wraps, no animation, no scroll-heavy lists in practice */
-:root{color-scheme:light dark;--bg:light-dark(#ffffff,#111111);--ink:light-dark(#000000,#f2f2f2);--mut:light-dark(#3d3d3d,#c4c4c4);--line:light-dark(#000000,#e6e6e6);--soft:light-dark(#eeeeee,#262626);--red:light-dark(#b3161b,#ff7a7a)}
-:root[data-theme=light]{color-scheme:light}
-:root[data-theme=dark]{color-scheme:dark}
+:root{color-scheme:light;--bg:#ffffff;--ink:#000000;--mut:#3d3d3d;--line:#000000;--soft:#eeeeee;--red:#b3161b}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--bg:#111111;--ink:#f2f2f2;--mut:#c4c4c4;--line:#e6e6e6;--soft:#262626;--red:#ff7a7a}}
+:root[data-theme=dark]{color-scheme:dark;--bg:#111111;--ink:#f2f2f2;--mut:#c4c4c4;--line:#e6e6e6;--soft:#262626;--red:#ff7a7a}
 *{box-sizing:border-box;min-width:0}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.5 Literata,Georgia,"Times New Roman",serif;overflow-x:clip}
@@ -77,6 +77,15 @@ ul{padding-left:1.2em}
 .opts{display:grid;gap:10px}
 .opt{font:inherit;font-size:19px;text-align:left;min-height:56px;padding:10px 16px;border:2px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);cursor:pointer}
 .opt.sel{background:var(--ink);color:var(--bg)}
+.btn,.opt,.chk,.tile{-webkit-appearance:none;appearance:none;-webkit-tap-highlight-color:transparent}
+.btn:active,.opt:active:not(:disabled),.tile:active,.chk:active{background:var(--ink);color:var(--bg)}
+.letters .opt{border-width:3px;background:var(--bg)}
+.letters .opt.sel,.letters .opt:disabled{background:var(--ink);color:var(--bg);opacity:1}
+.card .built{border:3px solid var(--line);min-height:62px}
+.built.pop{animation:pop .18s ease-out}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.03)}100%{transform:scale(1)}}
+.eink .built.pop{animation:none}
+.opt:disabled{cursor:default;color:var(--ink)}
 .opt.ok{border-width:4px;font-weight:800}
 .opt.ok::before{content:"✓ "}
 .opt.bad{text-decoration:line-through;color:var(--red);border-color:var(--red)}
@@ -123,10 +132,16 @@ details summary{cursor:pointer;font-weight:800;min-height:44px;display:flex;alig
 canvas.pad{display:block;width:100%;height:150px;border:2px solid var(--line);border-radius:10px;touch-action:none;color:var(--ink);background:var(--bg);background-image:linear-gradient(to bottom,transparent 72%,var(--soft) 72%,var(--soft) calc(72% + 2px),transparent calc(72% + 2px));cursor:crosshair}
 .padn{position:absolute;left:8px;top:4px;font-weight:800;color:var(--mut)}
 .gap{font-weight:800;letter-spacing:.05em}
+.sh{display:none}
+@media(max-width:480px){.lg{display:none}.sh{display:inline}}
+.daily{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;margin:6px 0 14px;padding:18px 20px;border:3px solid var(--line);border-radius:12px;background:var(--ink);color:var(--bg);font:inherit;text-align:left;cursor:pointer}
+.daily b{font-size:clamp(24px,5vw,32px);font-weight:800;line-height:1.1}
+.daily span{font-size:15px;opacity:.9}
+.daily:active{background:var(--bg);color:var(--ink)}
 .key{font-size:.8em;color:var(--mut);font-weight:400}
 .opt.sel .key,.btn.pri .key{color:inherit}
 @media(max-width:600px){body{font-size:17px}nav a{padding:8px 9px;font-size:16px}.brand{font-size:25px}table{font-size:14px}}
-@media(max-width:480px){.hrow{padding-top:8px}.brand{font-size:22px}.status{font-size:12px}nav{flex-wrap:nowrap;overflow-x:auto;margin-top:4px}nav a{flex:none;min-height:44px;padding:6px 9px;font-size:15px}main{padding:12px 0 40px}h1{font-size:28px}h2{font-size:22px;margin-top:22px}.card{padding:14px;border-width:2px}.q{font-size:20px;margin-bottom:12px}.opt{font-size:17px;min-height:48px;padding:8px 12px}.btn{min-height:46px;padding:8px 14px;font-size:16px}input.ans{font-size:20px;min-height:50px}.tile{min-height:0;padding:12px}.tile .big{font-size:32px}.tile b{font-size:18px}.flash .w{font-size:34px}.meta{margin-bottom:6px}.prog{margin-bottom:10px}}
+@media(max-width:480px){.hrow{padding-top:8px}.brand{font-size:22px}.status{font-size:12px}header{border-bottom-width:2px}nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:6px 0 8px}nav a{min-height:40px;padding:4px 2px;font-size:14px;justify-content:center;text-align:center;border:2px solid var(--line);border-radius:6px;margin:0}nav a.on{background:var(--ink);color:var(--bg);border-bottom:2px solid var(--line);margin:0}main{padding:12px 0 40px}h1{font-size:28px}h2{font-size:22px;margin-top:22px}.card{padding:14px;border-width:2px}.q{font-size:20px;margin-bottom:12px}.opt{font-size:17px;min-height:48px;padding:8px 12px}.btn{min-height:46px;padding:8px 14px;font-size:16px}input.ans{font-size:20px;min-height:50px}.tile{min-height:0;padding:12px}.tile .big{font-size:32px}.tile b{font-size:18px}.flash .w{font-size:34px}.meta{margin-bottom:6px}.prog{margin-bottom:10px}}
 </style>
 </head>
 <body>
@@ -136,9 +151,9 @@ canvas.pad{display:block;width:100%;height:150px;border:2px solid var(--line);bo
   <a href="#start" data-v="start">Start</a>
   <a href="#slowka" data-v="slowka">Słówka</a>
   <a href="#gry" data-v="gry">Gry</a>
-  <a href="#gramatyka" data-v="gramatyka">Gramatyka</a>
+  <a href="#gramatyka" data-v="gramatyka"><span class=lg>Gramatyka</span><span class=sh>Gramatyka</span></a>
   <a href="#odmiana" data-v="odmiana">Odmiana</a>
-  <a href="#panda" data-v="panda">Panda i podróż</a>
+  <a href="#panda" data-v="panda"><span class=lg>Panda i podróż</span><span class=sh>Panda</span></a>
   <a href="#postep" data-v="postep">Postęp</a>
  </nav>
 </div></header>
@@ -1689,7 +1704,9 @@ function mergeInto(x, push) {
   return { nw, nr, nd };
 }
 const exportJSON = () => JSON.stringify({ app: "wloski", v: 2, at: now(), words: S.words, del: S.del, srs: S.srs, res: S.res, resT: S.resT, gen: S.gen, misc: S.misc, stat: S.stat, texts: S.texts });
-const setMisc = (k, v) => { S.misc[k] = v; S.misc.u = now(); saveState("misc"); };
+const setMisc = (k, v) => { S.misc[k] = v; S.misc.u = now(); saveState("misc"); einkClass(); };
+const einkClass = () => document.documentElement.classList.toggle("eink", !!S.misc.eink);
+einkClass();
 
 function setStatus() {
   const n = Object.keys(S.words).length;
@@ -2099,7 +2116,7 @@ document.addEventListener("click", ev => {
     if (t.hasAttribute("data-next")) { SES.i++; if (SES.more && SES.i >= SES.items.length - 1) SES.items = SES.items.concat(SES.more(5)); if (SES.i >= SES.items.length) SES.end = true; renderSession(); window.scrollTo(0, 0); return; }
     if (t.dataset.say) { speak(t.dataset.say === "1" && it.listen ? it.listen : it.say || (it.word && it.word.it)); return; }
     if (t.hasAttribute("data-why")) { t.disabled = true; explainWhy(); return; }
-    if (t.dataset.l != null && it.k === "anag" && !SES.done) { if (t.disabled) return; t.disabled = true; t.classList.add("sel"); SES.built += it.ans[+t.dataset.l]; SES.used = (SES.used || []).concat(t); $("#built").textContent = SES.built; return; }
+    if (t.dataset.l != null && it.k === "anag" && !SES.done) { if (t.disabled) return; t.disabled = true; t.classList.add("sel"); SES.built += it.ans[+t.dataset.l]; SES.used = (SES.used || []).concat(t); const bt = $("#built"); bt.textContent = SES.built; bt.classList.remove("pop"); void bt.offsetWidth; bt.classList.add("pop"); return; }
     if (t.hasAttribute("data-undo") && !SES.done) { const u = (SES.used || []).pop(); if (u) { u.disabled = false; u.classList.remove("sel"); SES.built = SES.built.slice(0, -1); $("#built").innerHTML = esc(SES.built) || "&nbsp;"; } return; }
     if (t.hasAttribute("data-show") && it.k === "flash") {
       const w = it.word; const inp = document.querySelector("#card input.ans");
@@ -2397,6 +2414,29 @@ function xpBar() {
   const t = xpToday(), g = S.misc.goal, st = streak(), lvl = Math.floor(xpTotal() / 500) + 1;
   return "<div class=box><div class=row style='justify-content:space-between;margin:0'><b>Dziś " + t + " / " + g + " pkt</b><span>Seria: <b>" + pl3(st, "dzień", "dni", "dni") + "</b> · Poziom <b>" + lvl + "</b></span></div><div class=prog style='margin:8px 0 0'><i style='width:" + Math.min(100, 100 * t / g) + "%'></i></div></div>";
 }
+/* trening dnia: losowa mieszanka z całej puli, za każdym razem inna */
+function buildDaily() {
+  const out = [];
+  const ud = decks().filter(d => d.user).map(d => d.id);
+  const t = now();
+  const due = allWords().filter(w => { const s = srsGet(w.ref); return s && s.due <= t; });
+  const pool = allWords();
+  // słówka: najpierw do powtórki, potem losowe z Twoich i z gotowych zestawów
+  shuf(due).slice(0, 4).forEach(w => out.push(vocabItem(w, pick(["mc1", "mc2", "type", "flash"]), pool)));
+  const mineW = pool.filter(w => ud.includes(w.deck)), other = pool.filter(w => !ud.includes(w.deck) && w.deck !== "b:verbs");
+  for (let i = 0; out.length < 7 && i < 20; i++) { const w = pick(i % 2 && mineW.length ? mineW : other); const x = vocabItem(w, pick(["mc1", "mc2", "type", "cloze", "anag"]), pool); if (x) out.push(x); }
+  // czasy i tryby z generatora
+  GEN.many(() => GEN.tense(pick(V.TENSES.map(x => x.id))), 4).forEach(x => out.push(x));
+  // inne generatory: łączniki, periodo ipotetico, zaimki, indicativo/congiuntivo…
+  const gk = shuf(["ipo", "ipoT", "indcong", "ppimpf", "aux", "pron", "futcond", "conn", "dice"]).slice(0, 4);
+  gk.forEach(k => { const x = GEN.GENS[k].f(); if (x) out.push(x); });
+  // zadania z tematów gramatyki
+  shuf(G).slice(0, 3).forEach(tp => { const x = pick(topicItems(tp)); if (x) out.push(x); });
+  // tekst albo Panda
+  const tx = Object.keys(S.texts).length ? buildText(null, 1)[0] : null; if (tx) out.push(tx);
+  const pw = pool.filter(w => w.deck.startsWith("b:p-") || w.deck.startsWith("b:v-")); if (pw.length) { const x = vocabItem(pick(pw), pick(["mc1", "mc2"]), pool); if (x) out.push(x); }
+  return shuf(out.filter(Boolean)).slice(0, 20);
+}
 function vStart() {
   const due = dueWords().length;
   const uw = userWords().length;
@@ -2404,7 +2444,7 @@ function vStart() {
   const left = Math.max(0, S.misc.newPerDay - newToday());
   const newAvail = allWords().filter(w => userDecks.includes(w.deck) && !srsGet(w.ref)).length;
   const combos = Math.round(GEN.combos() / 1000);
-  return "<h1>Na dziś</h1>" + xpBar()
+  return "<h1>Na dziś</h1><button class=daily data-act=daily><b>Trening dnia →</b><span>20 losowych zadań z całej puli: słówka, czasy, tryby, łączniki, zaimki, gramatyka. Za każdym razem inny zestaw.</span></button>" + xpBar()
     + "<div class=grid2>"
     + "<button class=tile data-act=srs><span class=big>" + (due + Math.min(left, newAvail)) + "</span><b>Powtórka słówek</b><span class=mut>" + due + " do powtórki, " + Math.min(left, newAvail) + " nowych z Twoich zestawów</span></button>"
     + "<button class=tile data-go=gry><span class=big>" + combos + " tys.</span><b>Koło fortuny</b><span class=mut>Zakręć i graj — tyle kombinacji zadań z czasów i trybów</span></button>"
@@ -2690,6 +2730,7 @@ document.addEventListener("click", ev => {
   const t = ev.target.closest("button"); if (!t) return;
   const a = t.dataset.act;
   if (a === "seed") return seedNotes();
+  if (a === "daily") return startSession("Trening dnia", buildDaily(), "#start");
   if (a === "spin") return spin();
   if (t.dataset.wplay) return playWheel(+t.dataset.wplay);
   if (a === "sprint") return startSession("Sprint 60 s", GEN.many(mixGen(), 12), location.hash || "#gry", null, { sprint: 60, more: n => GEN.many(mixGen(), n) });
