@@ -1616,11 +1616,189 @@ window.GEN = (function () {
 })();
 
 </script>
+<script>/* ipo.js */
+/* Kurs: periodo ipotetico krok po kroku (typ I, II, III, misto). Zadania generowane bez końca. */
+window.IPO = (function () {
+  const V = window.VERBS;
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const shuf = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const cj = inf => V.conj(inf);
+  const alts = f => V.alts(f);
+  const first = f => f.split("|")[0];
+  const TN = { pres: "presente", fut: "futuro", cimp: "congiuntivo imperfetto", ctrp: "congiuntivo trapassato", cond: "condizionale presente", condp: "condizionale passato" };
+  const TYPN = { I: "Typ I (realny)", II: "Typ II (możliwy)", III: "Typ III (nierealny)", M: "Typ mieszany (misto)" };
+  /* warunki i skutki z polskimi formami dla „ja” (rodzaj męski): pl1 = typ I, pl2 = gdybym… */
+  const C = [
+    ["avere", "più tempo", "będę miał więcej czasu", "miał więcej czasu"],
+    ["avere", "i soldi", "będę miał pieniądze", "miał pieniądze"],
+    ["vincere", "alla lotteria", "wygram na loterii", "wygrał na loterii"],
+    ["sapere", "la verità", "poznam prawdę", "znał prawdę"],
+    ["trovare", "una Panda originale", "znajdę oryginalną Pandę", "znalazł oryginalną Pandę"],
+    ["parlare", "bene l'italiano", "będę dobrze mówił po włosku", "dobrze mówił po włosku"],
+    ["studiare", "di più", "będę się więcej uczył", "więcej się uczył"],
+    ["vedere", "l'annuncio", "zobaczę ogłoszenie", "zobaczył ogłoszenie"],
+    ["partire", "prima", "wyjadę wcześniej", "wyjechał wcześniej"],
+    ["risparmiare", "di più", "będę więcej oszczędzał", "więcej oszczędzał"],
+    ["avere", "una macchina", "będę miał samochód", "miał samochód"],
+    ["essere", "più giovane", null, "był młodszy"]
+  ];
+  const R = [
+    ["comprare", "una Panda 4x4", "kupię Pandę 4x4", "kupiłbym Pandę 4x4"],
+    ["andare", "a Bologna", "pojadę do Bolonii", "pojechałbym do Bolonii"],
+    ["fare", "un viaggio in macchina", "zrobię wycieczkę samochodem", "zrobiłbym wycieczkę samochodem"],
+    ["dire", "tutto", "powiem wszystko", "powiedziałbym wszystko"],
+    ["essere", "felice", "będę szczęśliwy", "byłbym szczęśliwy"],
+    ["imparare", "più parole", "nauczę się więcej słów", "nauczyłbym się więcej słów"],
+    ["prendere", "il treno", "pojadę pociągiem", "pojechałbym pociągiem"],
+    ["vivere", "in campagna", "zamieszkam na wsi", "mieszkałbym na wsi"],
+    ["chiamare", "il venditore", "zadzwonię do sprzedawcy", "zadzwoniłbym do sprzedawcy"],
+    ["restare", "a casa", "zostanę w domu", "zostałbym w domu"],
+    ["arrivare", "in tempo", "przyjadę na czas", "przyjechałbym na czas"],
+    ["guidare", "fino a Roma", "pojadę samochodem aż do Rzymu", "pojechałbym samochodem aż do Rzymu"]
+  ];
+  const SUBJ = [[0, "(io)"], [1, "(tu)"], [2, "Marco"], [2, "Anna"], [3, "(noi)"], [4, "(voi)"], [5, "i miei amici"]];
+  const T = { I: ["pres|fut", "pres|fut"], II: ["cimp", "cond"], III: ["ctrp", "condp"], M: ["ctrp", "cond"] };
+  const MARK = { I: ["", ""], II: ["", ""], III: ["l'anno scorso ", ""], M: ["l'anno scorso ", "adesso "] };
+  const fem = s => s === "Anna";
+  function formsFor(inf, tset, p, female) {
+    const c = cj(inf);
+    return tset.split("|").flatMap(t => alts(c.T[t][p]).filter(f => !/(o\/a|i\/e)/.test(c.T[t][p]) ? true : female ? /[ae]$/.test(f) : /[oi]$/.test(f) || p === 0 || p === 1 || p === 3 || p === 4));
+  }
+  function pair(type, withPl) {
+    for (let k = 0; k < 30; k++) {
+      const c = pick(C), r = pick(R); if (c[0] === r[0]) continue;
+      if (type === "I" && !c[2]) continue;
+      const sj = withPl ? [0, "(io)"] : pick(SUBJ);
+      const fa = formsFor(c[0], T[type][0], sj[0], fem(sj[1])), fb = formsFor(r[0], T[type][1], sj[0], fem(sj[1]));
+      return { c, r, sj, fa, fb, type };
+    }
+    return null;
+  }
+  const itFrame = x => "Se " + MARK[x.type][0] + x.sj[1] + " ___ (" + x.c[0] + ") " + x.c[1] + ", " + MARK[x.type][1] + "___ (" + x.r[0] + ") " + x.r[1] + ".";
+  const itFull = x => ("Se " + MARK[x.type][0] + x.sj[1].replace(/[()]/g, "") + " " + x.fa[0] + " " + x.c[1] + ", " + MARK[x.type][1] + x.fb[0] + " " + x.r[1] + ".").replace(/\s+/g, " ");
+  const plFull = x => x.type === "I" ? "Jeśli " + x.c[2] + ", " + x.r[2] + "." : x.type === "II" ? "Gdybym " + x.c[3] + ", " + x.r[3] + "." : x.type === "III" ? "Gdybym w zeszłym roku " + x.c[3] + ", " + x.r[3] + "." : "Gdybym w zeszłym roku " + x.c[3] + ", teraz " + x.r[3] + ".";
+  const WHY = {
+    I: "„Jeśli + przyszłość” = sytuacja realna → typ I: se + presente/futuro → presente/futuro.",
+    II: "„Gdybym…” o teraz/przyszłości = hipoteza → typ II: se + congiuntivo imperfetto → condizionale presente.",
+    III: "„Gdybym…” o przeszłości (w zeszłym roku) = nie da się zmienić → typ III: se + congiuntivo trapassato → condizionale passato.",
+    M: "Warunek w przeszłości (w zeszłym roku), skutek teraz (teraz) → misto: se + congiuntivo trapassato → condizionale presente."
+  };
+  const TYPES = ["I", "II", "III", "M"];
+  const randType = () => pick(["I", "II", "II", "III", "III", "M", "M"]);
+  const OPTS = ["I – realny", "II – możliwy", "III – nierealny", "misto"];
+
+  /* poziomy */
+  const L = {
+    1: { n: "Rozpoznaj formę", d: "Jaka to forma? To fundament — bez tego reszta się miesza.", f() {
+      const v = pick(C.concat(R))[0]; const c = cj(v); const t = pick(["cimp", "ctrp", "cond", "condp"]); const p = pick([0, 1, 2, 3, 4, 5]);
+      const f = first(c.T[t][p]); const o = ["congiuntivo imperfetto", "congiuntivo trapassato", "condizionale presente", "condizionale passato"];
+      return { k: "mc", cat: "ipoL1", q: "Jaka to forma?<br><span class=w>" + f + "</span> <span class=mut>(" + v + ", " + V.PERS[p] + ")</span>", o, a: o.indexOf(TN[t]), e: { cimp: "Congiuntivo imperfetto (-ssi, -sse…) → stoi PO „se” w typie II.", ctrp: "Congiuntivo trapassato (avessi/fossi + imiesłów) → stoi PO „se” w typie III i misto.", cond: "Condizionale presente (-rei, -rebbe…) → SKUTEK w typie II i misto.", condp: "Condizionale passato (avrei/sarei + imiesłów) → SKUTEK w typie III." }[t] };
+    } },
+    2: { n: "Gdzie stoi ta forma?", d: "Po „se” czy w skutku? Congiuntivo idzie do warunku, condizionale do skutku.", f() {
+      const v = pick(C.concat(R))[0]; const c = cj(v); const t = pick(["cimp", "ctrp", "cond", "condp", "cimp", "cond"]); const p = pick([0, 1, 2, 5]);
+      const o = ["po „se” (warunek)", "w skutku"]; const right = ["cimp", "ctrp"].includes(t) ? 0 : 1;
+      return { k: "mc", cat: "ipoL2", q: "Gdzie postawisz tę formę?<br><span class=w>" + first(c.T[t][p]) + "</span>", o, a: right, e: right === 0 ? "To congiuntivo (" + TN[t] + ") → zawsze po „se”." : "To condizionale (" + TN[t] + ") → zawsze w skutku. Nigdy po „se”!" };
+    } },
+    3: { n: "Ułóż formę", d: "Odmiana czterech form potrzebnych w zdaniach z „se”.", f() {
+      const v = pick(C.concat(R))[0]; const c = cj(v); const t = pick(["cimp", "ctrp", "cond", "condp"]); const p = pick([0, 1, 2, 3, 4, 5]);
+      return { k: "fill", cat: "ipoL3", dice: [v, V.PERS[p], TN[t]], q: "Odmień:<br>___", a: [alts(c.T[t][p]).join("|")], e: TN[t] + ": " + c.T[t].map((x, i) => V.PERS[i] + " " + first(x)).join(" · ") };
+    } },
+    4: { n: "Który typ? (z polskiego)", d: "Najważniejsza umiejętność: z polskiego zdania odczytać typ.", f() {
+      const type = pick(TYPES); const x = pair(type, true); if (!x) return null;
+      return { k: "mc", cat: "ipoL4", q: "Który typ będzie po włosku?<br><i>" + plFull(x) + "</i>", o: OPTS, a: TYPES.indexOf(type), e: WHY[type] + "<br><i>" + itFull(x) + "</i>", say: itFull(x) };
+    } },
+    5: { n: "Który typ? (z włoskiego)", d: "Rozpoznaj typ po czasownikach.", f() {
+      const type = pick(TYPES); const x = pair(type, false); if (!x) return null;
+      return { k: "mc", cat: "ipoL5", q: "Który to typ?<br><i>" + itFull(x) + "</i>", o: OPTS, a: TYPES.indexOf(type), e: TYPN[type] + ": " + { I: "presente/futuro + presente/futuro.", II: "congiuntivo imperfetto + condizionale presente.", III: "congiuntivo trapassato + condizionale passato.", M: "congiuntivo trapassato + condizionale presente." }[type], say: itFull(x) };
+    } },
+    6: { n: "Uzupełnij — typ podany", d: "Znasz typ, wpisz obie formy.", f() {
+      const type = randType(); const x = pair(type, false); if (!x) return null;
+      return { k: "fill", cat: "ipoL6", q: "<b>" + TYPN[type] + "</b><br>" + itFrame(x), a: [x.fa.join("|"), x.fb.join("|")], e: WHY[type], say: itFull(x) };
+    } },
+    7: { n: "Uzupełnij z polskiego", d: "Bez podpowiedzi typu — wybierasz sam na podstawie polskiego zdania.", f() {
+      const type = randType(); const x = pair(type, true); if (!x) return null;
+      return { k: "fill", cat: "ipoL7", q: "<i>" + plFull(x) + "</i><br>" + itFrame(x), a: [x.fa.join("|"), x.fb.join("|")], e: WHY[type], say: itFull(x) };
+    } },
+    8: { n: "Znajdź poprawne zdanie", d: "Trzy zdania mają typowy błąd, jedno jest dobre.", f() {
+      const type = pick(["I", "II", "III"]); const x = pair(type, false); if (!x) return null;
+      const ca = cj(x.c[0]), cb = cj(x.r[0]), p = x.sj[0], s = x.sj[1].replace(/[()]/g, "");
+      const mk = (a, b) => ("Se " + MARK[type][0] + s + " " + alts(a)[0] + " " + x.c[1] + ", " + alts(b)[0] + " " + x.r[1] + ".").replace(/\s+/g, " ");
+      const good = itFull(x);
+      const bad = [
+        mk(type === "III" ? ca.T.condp[p] : ca.T.cond[p], type === "III" ? cb.T.condp[p] : type === "I" ? cb.T.pres[p] : cb.T.cond[p]),
+        mk(type === "I" ? ca.T.pres[p] : type === "II" ? ca.T.cimp[p] : ca.T.ctrp[p], type === "I" ? cb.T.cimp[p] : cb.T.cimp[p]),
+        mk(type === "III" ? ca.T.ctrp[p] : ca.T.cimp[p], cb.T.fut[p]),
+        mk(ca.T.cond[p], cb.T.cimp[p])
+      ].filter((b, i, a) => b !== good && a.indexOf(b) === i);
+      const o = shuf([good].concat(shuf(bad).slice(0, 3)));
+      return { k: "mc", cat: "ipoL8", q: "Które zdanie jest poprawne?", o, a: o.indexOf(good), e: "Poprawne: <i>" + good + "</i><br>Typowe błędy: condizionale po „se” (se avrei ✗), congiuntivo w skutku (andassi ✗), futuro w skutku po congiuntivo.", say: good };
+    } },
+    9: { n: "Przekształć I → II → III", d: "To samo zdanie w różnych typach — widać, które czasowniki się zmieniają.", f() {
+      const to = pick(["II", "III", "M"]); const x0 = pair("I", false); if (!x0) return null;
+      const x = Object.assign({}, x0, { type: to }); x.fa = formsFor(x.c[0], T[to][0], x.sj[0], fem(x.sj[1])); x.fb = formsFor(x.r[0], T[to][1], x.sj[0], fem(x.sj[1]));
+      const src = Object.assign({}, x0); src.fa = [first(cj(x.c[0]).T.pres[x.sj[0]])]; src.fb = [first(cj(x.r[0]).T.pres[x.sj[0]])];
+      return { k: "fill", cat: "ipoL9", q: "Typ I: <i>" + itFull(src) + "</i><br>→ <b>" + TYPN[to] + "</b>:<br>" + itFrame(x), a: [x.fa.join("|"), x.fb.join("|")], e: WHY[to], say: itFull(x) };
+    } }
+  };
+  function exam() { const k = pick([4, 4, 5, 6, 7, 7, 8, 9]); return L[k].f(); }
+  function many(fn, n) { const out = []; let g = 0; while (out.length < n && g++ < n * 5) { const x = fn(); if (x) out.push(x); } return out; }
+
+  const TH = `
+<div class=note><b>W skrócie:</b> im bardziej sytuacja jest nierealna i im dalej w przeszłości, tym „głębiej w tył” cofasz czasy. Po „se” w typach II, III i misto <b>zawsze jest congiuntivo</b> (słychać <b>-ss-</b>: avessi, fossi, avessi avuto). W skutku <b>zawsze condizionale</b> (słychać <b>-rei / -rebbe</b>: andrei, avrei fatto). Nigdy odwrotnie.</div>
+<h3>Trzy pytania, które zawsze rozwiązują zadanie</h3>
+<ol>
+<li><b>Czy to może się naprawdę zdarzyć?</b> („Jeśli będę miał czas…”) → <b>typ I</b>. Koniec.</li>
+<li><b>Czy chodzi o przeszłość, której już nie zmienisz?</b> („Gdybym wtedy / wczoraj / w zeszłym roku…”) → <b>typ III</b> albo <b>misto</b>:
+ <ul><li>skutek też w przeszłości („…to bym wtedy pojechał”) → <b>III</b></li><li>skutek teraz („…to teraz bym był…”) → <b>misto</b></li></ul></li>
+<li><b>Wszystko inne</b> („Gdybym miał…” o teraz albo przyszłości, marzenia, rady) → <b>typ II</b>.</li>
+</ol>
+<h3>Polski ściągawka</h3>
+<table><tr><th>Po polsku</th><th>Typ</th><th>Po włosku</th></tr>
+<tr><td><b>Jeśli</b> będę miał czas, pojadę.</td><td>I</td><td>Se <b>avrò</b> tempo, <b>andrò</b>. / Se <b>ho</b> tempo, <b>vado</b>.</td></tr>
+<tr><td><b>Gdybym</b> miał czas (teraz), pojechałbym.</td><td>II</td><td>Se <b>avessi</b> tempo, <b>andrei</b>.</td></tr>
+<tr><td><b>Gdybym</b> miał czas <b>wtedy</b>, (wtedy) bym pojechał.</td><td>III</td><td>Se <b>avessi avuto</b> tempo, <b>sarei andato</b>.</td></tr>
+<tr><td><b>Gdybym wtedy</b> miał czas, <b>teraz</b> byłbym w Bolonii.</td><td>misto</td><td>Se <b>avessi avuto</b> tempo, adesso <b>sarei</b> a Bologna.</td></tr></table>
+<p>Polski „gdybym” wygląda tak samo w II i III. Różnicę robi <b>czas</b>: dopowiedz sobie „teraz” albo „wtedy”.</p>
+<h3>Jedna historia w czterech typach</h3>
+<table><tr><td>I</td><td>Se <b>troverò</b> una Panda originale, la <b>comprerò</b>.</td><td>Jeśli znajdę… kupię. (może się zdarzyć)</td></tr>
+<tr><td>II</td><td>Se <b>trovassi</b> una Panda originale, la <b>comprerei</b>.</td><td>Gdybym znalazł… kupiłbym. (hipoteza)</td></tr>
+<tr><td>III</td><td>Se l'anno scorso <b>avessi trovato</b> una Panda, l'<b>avrei comprata</b>.</td><td>Gdybym rok temu znalazł… byłbym kupił. (już po fakcie)</td></tr>
+<tr><td>misto</td><td>Se l'anno scorso <b>avessi trovato</b> una Panda, adesso la <b>guiderei</b>.</td><td>Gdybym rok temu znalazł… teraz bym nią jeździł.</td></tr></table>
+<h3>Schody: cofasz czasy o jeden stopień</h3>
+<table><tr><th></th><th>warunek (se +)</th><th>skutek</th></tr>
+<tr><td>I</td><td>presente / futuro</td><td>presente / futuro / imperativo</td></tr>
+<tr><td>II ↓</td><td>congiuntivo <b>imperfetto</b></td><td>condizionale <b>presente</b></td></tr>
+<tr><td>III ↓↓</td><td>congiuntivo <b>trapassato</b></td><td>condizionale <b>passato</b></td></tr>
+<tr><td>misto</td><td>congiuntivo trapassato (z III)</td><td>condizionale presente (z II)</td></tr></table>
+<p><b>Misto</b> to po prostu połówka z III (warunek, przeszłość) + połówka z II (skutek, teraz). Słowa-sygnały: <i>ieri, l'anno scorso, allora</i> w warunku i <i>adesso, oggi, ora</i> w skutku.</p>
+<h3>Rodzina form — naucz się tych 4 kolumn</h3>
+<table><tr><th>io</th><th>cong. imperfetto</th><th>cong. trapassato</th><th>condiz. presente</th><th>condiz. passato</th></tr>
+<tr><td>avere</td><td>avessi</td><td>avessi avuto</td><td>avrei</td><td>avrei avuto</td></tr>
+<tr><td>essere</td><td>fossi</td><td>fossi stato</td><td>sarei</td><td>sarei stato</td></tr>
+<tr><td>andare</td><td>andassi</td><td>fossi andato</td><td>andrei</td><td>sarei andato</td></tr>
+<tr><td>fare</td><td>facessi</td><td>avessi fatto</td><td>farei</td><td>avrei fatto</td></tr>
+<tr><td>comprare</td><td>comprassi</td><td>avessi comprato</td><td>comprerei</td><td>avrei comprato</td></tr></table>
+<p>Trapassato i condizionale passato to <b>avere/essere + imiesłów</b> — czyli wystarczy znać avessi/fossi i avrei/sarei.</p>
+<h3>Najczęstsze błędy</h3>
+<ul><li><s>Se avrei</s> → <b>se avessi</b> (po „se” nigdy condizionale)</li>
+<li><s>…, andassi</s> → <b>…, andrei</b> (w skutku nigdy congiuntivo)</li>
+<li><s>Se avessi avuto…, andrei ieri</s> → przeszłość w skutku = <b>sarei andato</b></li>
+<li><s>Se tu fosti</s> → <b>se tu fossi</b> (fosti to passato remoto)</li></ul>
+<h3>Jak rozwiązuję zadanie — krok po kroku</h3>
+<p><i>„Gdybym w zeszłym roku więcej oszczędzał, teraz kupiłbym Pandę.”</i><br>
+1) Może się zdarzyć? Nie. 2) Przeszłość? Warunek tak („w zeszłym roku”), skutek nie („teraz”) → <b>misto</b>.<br>
+3) Warunek z III: <b>avessi risparmiato</b>. Skutek z II: <b>comprerei</b>.<br>
+→ <b>Se l'anno scorso avessi risparmiato di più, adesso comprerei una Panda.</b></p>`;
+
+  return { L, exam, many, TH, pair, plFull, itFull, levels: Object.keys(L).map(Number) };
+})();
+
+</script>
 <script>/* app.js */
 {
 /* ====== narzędzia ====== */
 const $ = s => document.querySelector(s);
-const V = window.VERBS, G = window.GRAMMAR, P = window.PANDA, GEN = window.GEN, DK = window.DECKS || [], CONN = window.CONN;
+const V = window.VERBS, G = window.GRAMMAR, P = window.PANDA, GEN = window.GEN, DK = window.DECKS || [], CONN = window.CONN, IPO = window.IPO;
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const DAY = 864e5, now = () => Date.now();
 const shuf = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -2368,6 +2546,7 @@ function buildText(ids, n) {
   for (const [c, tx] of shuf(pref.slice(0, Math.max(n * 2, 30)))) { const k = tx.id + ":" + c.s + ":" + c.kind; if (used.has(k) && used.size < cands.length) continue; used.add(k); out.push(textItem(c, tx)); if (out.length >= n) break; }
   return out;
 }
+if (window.IPO) GEN.GENS.ipoK = { n: "Periodo ipotetico (kurs)", f: () => window.IPO.exam() };
 GEN.GENS.texts = { n: "Z moich tekstów", f: () => buildText(null, 1)[0] || null };
 
 async function genExercises(t, n, useWords, out) {
@@ -2435,7 +2614,8 @@ function buildDaily() {
   // tekst albo Panda
   const tx = Object.keys(S.texts).length ? buildText(null, 1)[0] : null; if (tx) out.push(tx);
   const pw = pool.filter(w => w.deck.startsWith("b:p-") || w.deck.startsWith("b:v-")); if (pw.length) { const x = vocabItem(pick(pw), pick(["mc1", "mc2"]), pool); if (x) out.push(x); }
-  return shuf(out.filter(Boolean)).slice(0, 20);
+  if (IPO) IPO.many(IPO.exam, 3).forEach(x => out.push(x));
+  return shuf(out.filter(Boolean)).slice(0, 22);
 }
 function vStart() {
   const due = dueWords().length;
@@ -2444,7 +2624,7 @@ function vStart() {
   const left = Math.max(0, S.misc.newPerDay - newToday());
   const newAvail = allWords().filter(w => userDecks.includes(w.deck) && !srsGet(w.ref)).length;
   const combos = Math.round(GEN.combos() / 1000);
-  return "<h1>Na dziś</h1><button class=daily data-act=daily><b>Trening dnia →</b><span>20 losowych zadań z całej puli: słówka, czasy, tryby, łączniki, zaimki, gramatyka. Za każdym razem inny zestaw.</span></button>" + xpBar()
+  return "<h1>Na dziś</h1>" + (IPO ? "<button class='tile' data-go=ipo style='width:100%;min-height:0;margin-bottom:10px'><b>Kurs: periodo ipotetico (I, II, III, misto) →</b><span class=mut>Wyjaśnienie krok po kroku i 9 poziomów zadań bez końca</span></button>" : "") + "<button class=daily data-act=daily><b>Trening dnia →</b><span>20 losowych zadań z całej puli: słówka, czasy, tryby, łączniki, zaimki, gramatyka. Za każdym razem inny zestaw.</span></button>" + xpBar()
     + "<div class=grid2>"
     + "<button class=tile data-act=srs><span class=big>" + (due + Math.min(left, newAvail)) + "</span><b>Powtórka słówek</b><span class=mut>" + due + " do powtórki, " + Math.min(left, newAvail) + " nowych z Twoich zestawów</span></button>"
     + "<button class=tile data-go=gry><span class=big>" + combos + " tys.</span><b>Koło fortuny</b><span class=mut>Zakręć i graj — tyle kombinacji zadań z czasów i trybów</span></button>"
@@ -2459,13 +2639,23 @@ function vStart() {
     + "<h2>Jak się uczyć</h2><p>Codziennie zbierz " + S.misc.goal + " punktów: powtórka słówek, jedno zakręcenie kołem albo sprint. Za dobrą odpowiedź jest 10 pkt, za próbę 1 pkt. Seria rośnie każdego dnia, w którym dojdziesz do celu. Nowe słówka z lekcji wgrywaj od razu — trafią do wszystkich ćwiczeń, a czasowniki do generatora zdań.</p>";
 }
 
+/* ====== kurs periodo ipotetico ====== */
+function vIpo() {
+  if (!IPO) return vGram();
+  let h = "<p class=small><a href='#gramatyka'>← Gramatyka</a></p><h1>Periodo ipotetico — kurs</h1><p>Idź po kolei: najpierw formy, potem rozpoznawanie typu, na końcu pełne zdania. Każdy poziom to 12 nowych, losowych zadań — możesz powtarzać do skutku. Gdy masz 80% na poziomie, przejdź dalej.</p>";
+  h += "<div class=row><button class='btn pri' data-ipo=exam>Egzamin: 20 zadań z całości</button><button class=btn data-ipo=all>Bez końca</button></div>";
+  h += "<details class=box" + (Object.keys(S.stat).some(k => k.startsWith("ipoL")) ? "" : " open") + "><summary>Wyjaśnienie: jak to działa (przeczytaj najpierw)</summary><div class=theory>" + IPO.TH + "</div></details>";
+  h += "<h2>Poziomy</h2><div class=scroll><table>" + IPO.levels.map(k => { const L = IPO.L[k], a = S.stat["ipoL" + k]; const pc = a && a[1] ? Math.round(100 * a[0] / a[1]) : null; return "<tr><td><b>" + k + ". " + esc(L.n) + "</b>" + (pc != null ? " <span class=lvl>" + pc + "%" + (pc >= 80 && a[1] >= 10 ? " ✓" : "") + "</span>" : "") + "<br><span class='small mut'>" + esc(L.d) + "</span></td><td style='text-align:right'><button class='btn sm' data-ipo='" + k + "'>Ćwicz</button></td></tr>"; }).join("") + "</table></div>";
+  return h;
+}
+
 /* ====== gry ====== */
 const mixGen = () => { const k = Object.keys(GEN.GENS); return () => GEN.GENS[pick(k)].f(); };
 const tenseOr = (ts, extra) => () => Math.random() < 0.65 || !extra ? GEN.tense(pick(ts)) : extra();
 const myVocab = n => { const ds = decks().filter(d => d.user).map(d => d.id); return buildVocab(ds.length ? ds : ["b:verbs"], "mix", n); };
 const WHEEL = [
   ["Presente", tenseOr(["pres"])], ["Pass. pross.", tenseOr(["pp"], GEN.aux)], ["Imperfetto", tenseOr(["impf", "trp"], GEN.ppImpf)], ["Futuro", tenseOr(["fut", "futa"], GEN.futCond)],
-  ["Condizionale", tenseOr(["cond", "condp"], GEN.futCond)], ["Congiuntivo", tenseOr(["cpres", "cpass", "cimp", "ctrp"], GEN.indCong)], ["Ipotetico", () => Math.random() < 0.6 ? GEN.ipotetico() : GEN.ipoType()], ["Zaimki", GEN.pronomi],
+  ["Condizionale", tenseOr(["cond", "condp"], GEN.futCond)], ["Congiuntivo", tenseOr(["cpres", "cpass", "cimp", "ctrp"], GEN.indCong)], ["Ipotetico", () => IPO ? IPO.exam() : GEN.ipotetico()], ["Zaimki", GEN.pronomi],
   ["Imperativo", tenseOr(["imp"])], ["Łączniki", () => CONN.item()], ["Słówka", null], ["Odmiana", () => GEN.dice(S.misc.tenses)], ["×2 Mix", mixGen()]
 ];
 let WROT = 0, WRES = null, WSPIN = false;
@@ -2506,7 +2696,7 @@ function vGry() {
 }
 const VERBS_N = () => 120 + myVerbs().length;
 function statFor(k) {
-  const cats = { tense: Object.keys(TN), ipo: ["ipo"], ipoT: ["ipoT"], indcong: ["indcong"], ppimpf: ["ppimpf"], aux: ["aux"], pron: ["pron"], futcond: ["futcond"], dice: ["dice"], texts: ["text"], conn: ["conn"] }[k] || [k];
+  const cats = { tense: Object.keys(TN), ipo: ["ipo"], ipoT: ["ipoT"], indcong: ["indcong"], ppimpf: ["ppimpf"], aux: ["aux"], pron: ["pron"], futcond: ["futcond"], dice: ["dice"], texts: ["text"], conn: ["conn"], ipoK: ["ipoL4", "ipoL5", "ipoL6", "ipoL7", "ipoL8", "ipoL9"] }[k] || [k];
   let ok = 0, all = 0; cats.forEach(c => { const a = S.stat[c]; if (a) { ok += a[0]; all += a[1]; } });
   return all ? "zrobione " + all + " · dobrze " + Math.round(100 * ok / all) + "%" : "";
 }
@@ -2589,6 +2779,7 @@ function vTopic(id) {
   const s = topicScore(t);
   return "<p class=small><a href='#gramatyka'>← Wszystkie tematy</a></p><h1>" + esc(t.n) + "</h1><p class=mut>" + esc(t.pl) + " · poziom " + t.l + "</p>"
     + "<div class=row><button class='btn pri' data-topic='" + t.id + "'>Ćwicz (" + s.total + " zadań)</button>" + (s.wrong ? "<button class=btn data-topicw='" + t.id + "'>Tylko błędne (" + s.wrong + ")</button>" : "") + "</div>"
+    + (t.id === "ipotetico" && IPO ? "<div class='box dash'><b>Myli Ci się I, II, III i misto?</b> Zrób <a href='#ipo'>kurs krok po kroku</a> — 9 poziomów, zadania bez końca.</div>" : "")
     + "<div class=theory>" + t.th + "</div>"
     + (SAMPLE ? "<div class='box dash'><h3>Więcej zadań</h3><p class=small>Claude ułoży nowe zadania do tego tematu i doda je na stałe do bazy.</p><div class=row><label class=chk><input type=checkbox id=gw>z moich słówek</label><button class='btn pri' data-gen='" + t.id + "'>Dorób 10 zadań</button></div>" + outP("gout") + "</div>" : "");
 }
@@ -2705,7 +2896,7 @@ function rerender() {
 }
 function route(soft) {
   const h = location.hash.slice(1) || "start";
-  document.querySelectorAll("#nav a").forEach(a => a.classList.toggle("on", a.dataset.v === h || (h.startsWith("g-") && a.dataset.v === "gramatyka") || (h === "slowka-gotowe" && a.dataset.v === "slowka")));
+  document.querySelectorAll("#nav a").forEach(a => a.classList.toggle("on", a.dataset.v === h || ((h.startsWith("g-") || h === "ipo") && a.dataset.v === "gramatyka") || (h === "slowka-gotowe" && a.dataset.v === "slowka")));
   const v = $("#view");
   GEN.setExtra(myVerbs());
   if (h === "trening") { renderSession(); }
@@ -2716,6 +2907,7 @@ function route(soft) {
   else if (h === "panda") v.innerHTML = vPanda();
   else if (h === "postep") v.innerHTML = vPostep();
   else if (h === "gry") v.innerHTML = vGry();
+  else if (h === "ipo") v.innerHTML = vIpo();
   else v.innerHTML = vStart();
   setStatus();
   if (!soft) window.scrollTo(0, 0);
@@ -2730,6 +2922,7 @@ document.addEventListener("click", ev => {
   const t = ev.target.closest("button"); if (!t) return;
   const a = t.dataset.act;
   if (a === "seed") return seedNotes();
+  if (t.dataset.ipo) { const k = t.dataset.ipo; if (k === "exam") return startSession("Periodo ipotetico — egzamin", IPO.many(IPO.exam, 20), "#ipo"); if (k === "all") return startSession("Periodo ipotetico — bez końca", IPO.many(IPO.exam, 6), "#ipo", null, { more: n => IPO.many(IPO.exam, n) }); const L = IPO.L[+k]; return startSession("Kurs " + k + ": " + L.n, IPO.many(L.f, 12), "#ipo"); }
   if (a === "daily") return startSession("Trening dnia", buildDaily(), "#start");
   if (a === "spin") return spin();
   if (t.dataset.wplay) return playWheel(+t.dataset.wplay);
